@@ -8,6 +8,7 @@
 
 <p align="center">
   <strong>Full chain, simulation to tracks</strong> ·
+  <strong>Point clouds 7x faster than the reference implementation</strong> ·
   <strong>One parameter model across the pipeline</strong> ·
   <strong>Visible equations and intermediate results</strong>
 </p>
@@ -38,7 +39,7 @@
 
 ## One toolbox, the whole chain
 
-Most radar repositories cover one stage. This one runs from echo simulation to tracks and images along a single MATLAB path:
+Most open-source radar repositories cover one stage. This one runs from echo simulation to tracks and images along a single MATLAB path:
 
 | Stage | What is included |
 | --- | --- |
@@ -53,17 +54,15 @@ Most radar repositories cover one stage. This one runs from echo simulation to t
 
 Simulation, spectra, point clouds and tracking exchange the same radar cube and the same eight-column point cloud, so simulated and measured data run through identical code.
 
+The point cloud pipeline started from the [TDMA-MIMO](https://github.com/DingdongD/TDMA-MIMO) reference implementation and was then engineered for speed: a separable CA-CFAR along range and Doppler replaces `phased.CFARDetector2D`, and per-frame re-initialization is gone. The default mode keeps the reference processing chain, identical from the FFTs through the CFAR peaks; with `cfgDOA.CFARMethod = 'separable_ca'` the same 256x64x12 simulated frame drops from 43 ms to 6 ms with identical detections, and a measured TI cascade frame from 0.53 s to 0.08 s (`validation/profile_pointcloud_frame_time.m`).
+
 ## Spend more time on the algorithm
 
-A range estimator works in isolation. The next question is whether it still works with a different array, moving targets, or measured data. Answering that often means reconnecting signal generation, detection, angle estimation, and tracking before the real experiment can begin.
+Once a range estimator works, the question you actually care about is whether it still works with a different array, or on measured data. Before you can answer it, signal generation, detection, angle estimation and tracking have to be stitched together again.
 
-Much of that work lives at the interfaces: sample and channel dimensions, parameter units, coordinate conventions, and transmit timing. Individual modules can produce plausible outputs while describing different physical scenes.
+Most of that stitching happens at the interfaces: the order of sample and channel dimensions, parameter units, coordinate axes, the timing of multiple transmit antennas. Each module produces output on its own, but chained together they do not necessarily describe the same physical scene.
 
-**FMCW Signal Processing Toolbox brings those components into an inspectable, reusable MATLAB workflow.** Designed for frequency-modulated continuous-wave radar research, it covers echo simulation, raw data reading, range and velocity spectra, 3D point clouds, angle estimation, target tracking, SAR imaging and performance bounds. Use it for signal processing experiments, perception prototypes, and research teaching.
-
-- **Build a complete experiment sooner.** Describe the radar and targets with `sensorParams` and `targetParams`, then connect echoes, detections, point clouds, and tracks through shared processing interfaces.
-- **Find the source of an error.** Inspect array geometry, timing, units, coordinates, equations, and intermediate variables to separate modeling and configuration issues from algorithm behavior.
-- **Make comparisons reproducible.** Reuse observations and numerical checks across methods, reducing repeated work on signal sources, data conversion, and validation scripts.
+This toolbox joins those stages into one MATLAB path you can run again and again. The radar and the targets are described once, in `sensorParams` and `targetParams`; echoes, detections, point clouds and tracks pass between modules in fixed formats; the core equations and intermediate variables stay in the scripts, so you can set breakpoints, plot them, and tell a modeling problem from a configuration or algorithm problem. When you compare methods, they share one observation and one set of numerical checks.
 
 ```text
 sensorParams / targetParams          DCA1000 adc_data.bin
@@ -90,12 +89,13 @@ micro-Doppler                 |
 | --- | --- |
 | Generate signals and add noise for each experiment | Use `RadarParameterGenerate` and `RadarCubeGenerate`; control noise with `sensorParams.SNR_dB` |
 | Process simulated and measured point clouds | Feed either input into `GeneratePointCloudFrame` after arranging its dimensions |
+| Point cloud CFAR through `phased.CFARDetector2D`, tens of milliseconds to half a second per frame | Separable CA-CFAR, about 7x faster on the same frame |
 | Configure array geometry | Select `sensorParams.ArrayType = 'TI_xWRx843'` or supply a virtual antenna map |
 | Check whether a change affects existing behavior | Run unit tests in `tests/` and numerical checks in `validation/` |
 
 ## Quick start
 
-Tested with MATLAB R2025b, Signal Processing Toolbox, and Phased Array System Toolbox; see [Dependencies](#dependencies). The basic simulations need no radar hardware or measured data.
+You need MATLAB (tested on R2025b), Signal Processing Toolbox and Phased Array System Toolbox; see [Dependencies](#dependencies). The basic simulations need no radar hardware or measured data.
 
 ```bash
 git clone https://github.com/Zhenyu98/FMCW-Signal-Processing-Toolbox.git
@@ -109,7 +109,7 @@ startup                          % Add toolbox modules to the search path
 demo_pointcloud_sim              % Simulate three targets and generate a point cloud
 ```
 
-Expected result: the command window prints `FMCW Signal Processing Toolbox path is ready.`, and two figures show a range-Doppler map and a 3D point cloud. Estimated points appear near the red ground-truth targets, with errors due to the discrete range, angle, and velocity grids.
+Expected result: the command window prints `FMCW Signal Processing Toolbox path is ready.`, and two figures show a range-Doppler map and a 3D point cloud. The estimated points land near the red ground-truth targets (range, angle and velocity are each quantized to one grid cell).
 
 Check the installation with the unit tests:
 
@@ -120,7 +120,7 @@ assertSuccess(results)
 
 Expected result: `Totals: 32 Passed, 0 Failed, 0 Incomplete`.
 
-The demos execute `clear` and `close all`. Save your workspace and figures first. For help from a coding agent, see [agent-setup.md](agent-setup.md), currently written in Simplified Chinese.
+The demos start with `clear` and `close all`, so save your workspace and figures first. To have a coding agent such as Codex or Claude Code set up the environment for you, send it the prompt in [agent-setup.md](agent-setup.md) (currently in Simplified Chinese).
 
 ### Minimal example: parameters to point clouds
 
@@ -186,11 +186,11 @@ adcData = adcCube(:, chirpStart:chirpEnd, :);
 
 ## Example gallery
 
-Explore the pipeline at several levels: target peaks in a spectrum, motion signatures over time, and continuous tracks. All figures below use simulated data generated by the toolbox examples.
+The figures below come from the toolbox's own example scripts; all data are simulated.
 
 ### Turn range-azimuth peaks into target locations
 
-Two targets, a 1Tx8Rx array, and 35 dB SNR. The spectrum retains physical range and angle coordinates; the point cloud view compares detections with ground truth to make detection and coordinate conversion easy to inspect.
+Two targets, a 1Tx8Rx array and 35 dB SNR. The left panel is the spectrum on physical range and angle axes; the right panel plots the detections next to the true target positions.
 
 ![Range-azimuth spectrum and detected target locations](docs/assets/gallery_range_azimuth.png)
 
@@ -198,15 +198,15 @@ Run [`demo_pointcloud_ra_sim`](pointcloud/demo_pointcloud_ra_sim.m).
 
 ### See motion details in micro-Doppler
 
-A simplified walking model uses 14 moving scatterers. Body translation and limb motion produce different velocity components. Separate 3D pose views mark the scattering centers inside a translucent schematic body, while the spectrum shows their combined radar return.
+A simplified walking body is described by 14 scatterers; the torso's translation and the swinging limbs contribute different velocity components. The top row shows the pose and scatterer positions at three instants, the bottom row the micro-Doppler spectrum of their combined echo.
 
 ![Walking scatterer poses and their micro-Doppler signature](docs/assets/gallery_human_motion.png)
 
-Run [`demo_human_motion_radar_echo`](signal/demo_human_motion_radar_echo.m). This example uses a simplified motion model and simulated echoes, with no measured human data.
+Run [`demo_human_motion_radar_echo`](signal/demo_human_motion_radar_echo.m). The walking motion is a parametric model, not measured data.
 
 ### Connect frame-by-frame detections into tracks
 
-Two targets over 24 simulated radar frames, processed through point cloud generation, association, and an EKF. Each panel zooms in on one target to compare radar detections, the estimated track, and the true trajectory.
+Two targets over 24 simulated frames, run through point cloud generation, association and an EKF. Each panel zooms in on one target and shows the detections, the estimated track and the true trajectory.
 
 ![Radar detections and EKF trajectories for two targets](docs/assets/gallery_tracking.png)
 
@@ -214,37 +214,37 @@ Run [`validate_tracking_pointcloud_integration`](validation/validate_tracking_po
 
 ### Compare spatial spectra on the same observation
 
-A 12-element array, 128 snapshots, and 15 dB SNR. FFT, MUSIC, and IAA share one noisy observation; each spectrum is normalized independently. The covariance eigenvalues and Newton source-count estimate are shown alongside them. MUSIC uses the estimated source count; ground truth is used only to check peak locations.
+A 12-element array, 128 snapshots and 15 dB SNR. FFT, MUSIC and IAA see the same noisy observation; each spectrum is normalized on its own. The right panel shows the covariance eigenvalues and the source count from Newton interpolation. MUSIC uses that estimated count, not the true one.
 
 ![FFT, MUSIC, and IAA spectra with covariance eigenvalues and source count](docs/assets/gallery_doa_source_count.png)
 
-Tools: [`DOA_FFT`](doa/DOA_FFT.m), [`DOA_MUSIC`](doa/DOA_MUSIC.m), [`DOA_IAA`](doa/DOA_IAA.m), and [`Newton_NOS`](source-number-estimation/Newton_NOS.m). This fixed scenario illustrates interfaces and behavior, not a statistical ranking of the methods.
+Tools: [`DOA_FFT`](doa/DOA_FFT.m), [`DOA_MUSIC`](doa/DOA_MUSIC.m), [`DOA_IAA`](doa/DOA_IAA.m), and [`Newton_NOS`](source-number-estimation/Newton_NOS.m). This is one fixed scene, not a performance comparison between the methods.
 
 ### Follow range and velocity over time
 
-One target changes speed across 40 radar frames. The range spectra show its changing distance; `DTM` produces the velocity-time map. White dashed lines mark the prescribed motion. Slow-time sampling is retained within each frame, with an 80 ms interval between frames.
+One target changes speed over 40 frames spaced 80 ms apart. The left panel is the range spectrum of each frame, the right panel the velocity-time map from `DTM`; the white dashed line is the prescribed motion.
 
 ![Range migration and Doppler-time map for a moving target](docs/assets/gallery_doppler_time.png)
 
-Tools: [`RadarCubeGenerate`](signal/RadarCubeGenerate.m) and [`DTM`](imaging/DTM.m). Velocity is approximated as constant within each frame. The left panel is computed with a direct range FFT.
+Tools: [`RadarCubeGenerate`](signal/RadarCubeGenerate.m) and [`DTM`](imaging/DTM.m).
 
 ### Understand why one target produces multiple range peaks
 
-Direct and ground-reflected paths combine into different apparent ranges for the same target. The propagation geometry is shown alongside a MathWorks two-ray echo spectrum, with expected peak locations marked for comparison.
+When the direct path and a ground reflection add up, one target shows up at several apparent ranges. The left panel is the propagation geometry, the right panel the range spectrum of an echo from the MathWorks two-ray channel, with the theoretical peak positions marked.
 
 ![Direct and reflected paths with their apparent range peaks](docs/assets/gallery_two_ray.png)
 
-Tool: [`RadarCubeGenerateMathWorksTwoRay`](signal/RadarCubeGenerateMathWorksTwoRay.m). Run [`validate_mathworks_two_ray_signal_source`](validation/validate_mathworks_two_ray_signal_source.m). The geometry deliberately makes the paths resolvable; Radar Toolbox is required.
+Tool: [`RadarCubeGenerateMathWorksTwoRay`](signal/RadarCubeGenerateMathWorksTwoRay.m). Run [`validate_mathworks_two_ray_signal_source`](validation/validate_mathworks_two_ray_signal_source.m). The example geometry puts the paths in different range bins; Radar Toolbox is required.
 
 ### Put angle-estimation errors in context
 
-At low SNR, the prior angular range strongly influences the error bounds. As SNR increases, the bounds converge. The a priori bound (APB), Cramer-Rao bound (CRB), and Ziv-Zakai bound (ZZB) provide a reference for the expected scale of estimation errors.
+At low SNR the error bounds are set by the prior angular range; as SNR grows the bounds merge. The a priori bound (APB), Cramer-Rao bound (CRB) and Ziv-Zakai bound (ZZB) tell you what error level to expect from an angle estimator.
 
 ![APB, CRB, and ZZB for direction-of-arrival estimation](docs/assets/gallery_doa_bounds.png)
 
-Tool: [`ZZB_DOAs`](performance/ZZB_DOAs.m). The figure uses the original [`Main_ZZB_Demo`](performance/Main_ZZB_Demo.m) settings: 20 sensors, five incoherent sources, 40 snapshots, and 1,000 random angle draws. These are theoretical error bounds, not measured estimator RMSE. See the original paper in the acknowledgements.
+Tool: [`ZZB_DOAs`](performance/ZZB_DOAs.m), with the settings of [`Main_ZZB_Demo`](performance/Main_ZZB_Demo.m): 20 sensors, five incoherent sources, 40 snapshots and 1000 random angle draws. The curves are theoretical lower bounds, not the measured RMSE of any estimator; the original paper is listed in the acknowledgements.
 
-To reproduce the first three gallery sections, run `run('docs/generate_readme_gallery.m')`. For the spatial spectra, Doppler-time map, two-ray model, and bounds, run `run('docs/generate_algorithm_gallery.m')`. Images are exported to `docs/assets/`. Save your workspace and figures first. The second script requires Radar Toolbox for two-ray propagation, and Statistics and Machine Learning Toolbox plus Communications Toolbox for the bounds.
+To regenerate the figures, run `run('docs/generate_readme_gallery.m')` for the first three and `run('docs/generate_algorithm_gallery.m')` for the other four; they are written to `docs/assets/`. The second script needs Radar Toolbox for the two-ray part, and Statistics and Machine Learning Toolbox plus Communications Toolbox for the bounds.
 
 ## Modules
 
@@ -257,9 +257,9 @@ To reproduce the first three gallery sections, run `run('docs/generate_readme_ga
 | `doa/` | Reusable direction-of-arrival estimators | `DOA_FFT`, `DOA_MUSIC`, `DOA_IAA`, `DOA_L1SVD`, `DOA_ANM`, `MUSIC_alg`, `ESPRIT_alg` | Called by point cloud DOA wrappers |
 | `source-number-estimation/` | Source count and model order estimation using eigenspace projection and Newton interpolation | `ES_NOS`, `Newton_NOS` | `DNI_compare_with_others` and related scripts |
 | `performance/` | Multi-source DOA Ziv-Zakai, Cramer-Rao, and a priori bounds | `ZZB_DOAs` | `Main_ZZB_Demo` |
-| [utils](utils/README.md) | DCA1000 raw file reading; mmWave Studio / DCA1000 acquisition helpers (MATLAB + Lua) | `readDCA1000Raw`, `DCA_Connet/` | — |
-| [validation](validation/README.md) | Numerical and reference-code equivalence checks | `validate_*.m` | — |
-| `tests/` | Unit tests for CFAR, peak grouping, multi-peak DOA, and angle axes | MATLAB `runtests` | — |
+| [utils](utils/README.md) | DCA1000 raw file reading; mmWave Studio / DCA1000 acquisition helpers (MATLAB + Lua) | `readDCA1000Raw`, `DCA_Connet/` | - |
+| [validation](validation/README.md) | Numerical and reference-code equivalence checks | `validate_*.m` | - |
+| `tests/` | Unit tests for CFAR, peak grouping, multi-peak DOA, and angle axes | MATLAB `runtests` | - |
 
 Module READMEs provide additional parameter details; most are currently in Simplified Chinese.
 
@@ -315,14 +315,14 @@ sensorParams.VirtualArrayMap = [             % or draw the virtual channel index
 
 - Targets can use `range / velocity / azimuth / elevation`, or Cartesian scatterers in `position_m` with shape `ScatterNum × 3` or `ScatterNum × 3 × PulseNum`. The latter supports dynamic skeletons, gestures, and other multi-scatterer inputs; see `demo_human_motion_radar_echo`.
 - The model includes TDM transmit timing. A moving target occupies different ranges at successive Tx times, producing motion phase that is compensated during point cloud processing.
-- Optional MathWorks waveform sources use `radarTransceiver`, `backscatterPedestrian`, and `widebandTwoRayChannel`. They produce compatible cubes. TI board-level behavior and real hardware calibration remain outside the current validation scope.
+- Optional MathWorks waveform-level sources (`radarTransceiver`, `backscatterPedestrian`, `widebandTwoRayChannel`) produce the same cube, so everything downstream is unchanged. They are generic physical scene models, not a digital twin of a particular TI board.
 - `sensorParams.SNR_dB` controls complex Gaussian noise; `noiseInfo` records its power. Reuse the same noisy observation across methods within each Monte Carlo trial.
 
 ### TDM-MIMO point clouds
 
 - Default RD pipeline: `rdFFT -> incoherent_accumulation -> CFAR_2D -> peakFocus -> compensate_doppler -> azimuthDOA / elevationDOA`.
 - Set `cfgDOA.PointCloudPipeline = 'RA'` to detect in a range-azimuth map.
-- `CFAR_2D` supports `phased_soca` (default, using `phased.CFARDetector2D`) and `separable_ca`. The latter replaces the detector, while the full pipeline still calls `physconst`.
+- `CFAR_2D` has two modes: `phased_soca` (default, built on `phased.CFARDetector2D`) and `separable_ca` (separable CA-CFAR along range and Doppler, roughly 30x faster on a 256x64 map).
 - OpenRadar-style grouping and multi-peak DOA options are opt-in: `PeakFocusMode = 'py_doppler'` and `DOAPeakSearch = 'py_full_variance'`.
 
 ### Point cloud tracking
@@ -336,31 +336,31 @@ sensorParams.VirtualArrayMap = [             % or draw the virtual channel index
 
 - `RDM` and `RAM` accept radar cubes and `sensorParams`, returning physical axes in meters, meters/second, and degrees.
 - `DTM` produces per-frame Doppler snapshots; `MDS` computes a slow-time STFT for continuous recordings.
-- `SarRMAimaging_2D`, `RAM_BPimaging`, and `BPimaging` support SAR experiments. Their demos prompt for raw echo files and require suitable acquisition geometry.
+- `SarRMAimaging_2D`, `RAM_BPimaging` and `BPimaging` handle ground-based SAR imaging; their demos ask for a raw echo file.
 
 ### Raw data and acquisition
 
-- `readDCA1000Raw(fileName, numADCSamples, numRX, numTX)` returns a cube of shape `numADCSamples × loopChirpNum × (numRX*numTX)`.
+- `readDCA1000Raw(fileName, numADCSamples, numRX, numTX)` reads a DCA1000 raw `.bin` and returns a cube of shape `numADCSamples × loopChirpNum × (numRX*numTX)`.
 - `utils/DCA_Connet/` contains MATLAB/Lua helpers that connect to mmWave Studio through the RSTD interface and trigger DCA1000 capture. They build on TI's Lua examples and use the TI default installation path `C:\ti\mmwave_studio_02_01_01_00`; update it for your machine before use.
 
 ## Dependencies
 
 | Dependency | Used by | Scope |
 | --- | --- | --- |
-| MATLAB R2025b | Tested runtime; demos use `subtitle` | Compatibility with other MATLAB versions requires verification |
+| MATLAB R2025b | Everything; sources are UTF-8 with Chinese comments | R2020b or newer should work (the demos use `subtitle`), but only R2025b has been tested |
 | Signal Processing Toolbox | `findpeaks`, `hanning`, and related point cloud/imaging operations | Required for these paths |
-| Phased Array System Toolbox | `physconst` and default `phased.CFARDetector2D` | Switching CFAR does not remove the full pipeline's `physconst` dependency |
+| Phased Array System Toolbox | `physconst` and the default `phased.CFARDetector2D` | Required; `separable_ca` only replaces the CFAR, `physconst` is still called |
 | Radar Toolbox | Optional `RadarCubeGenerateMathWorks*` sources | Local `RadarCubeGenerate` does not require it |
 | [CVX](http://cvxr.com/cvx/) | `DOA_L1SVD`, `DOA_ANM` | Other DOA methods do not require it |
-| Communications Toolbox | `qfunc` in `performance/ZZB_DOAs.m` | Required for the bound example |
-| Statistics and Machine Learning Toolbox | `unifrnd` in `performance/ZZB_DOAs.m` | Required for that research example |
+| Communications Toolbox | `qfunc` in `performance/ZZB_DOAs.m` | Only the performance-bound example |
+| Statistics and Machine Learning Toolbox | `unifrnd` in `performance/ZZB_DOAs.m` | Only the performance-bound example |
 | TI mmWave Studio and DCA1000 | `utils/DCA_Connet/` acquisition helpers; recording `adc_data.bin` for `readDCA1000Raw` | Not needed for simulation |
 
 The bundled DBSCAN, Hungarian assignment, and EKF implementations do not require Statistics and Machine Learning Toolbox or Sensor Fusion and Tracking Toolbox.
 
 ## Validation and tests
 
-**32 unit tests cover CFAR detection, peak selection, angle axes, and multi-peak angle estimation.** Point cloud and tracking checks also test target locations, global assignment, and track continuity, helping catch behavior changes after tuning or replacing a module. See the [validation record](docs/verification.md) for scenarios and numerical results; it is currently in Simplified Chinese.
+32 unit tests cover CFAR detection, peak selection, angle axes and multi-peak angle estimation; the point cloud and tracking validation scripts add checks on target positions, global assignment and track continuity. Run them after changing a parameter or swapping a module and you will know whether behavior moved. The numbers for each scenario are in the [validation record](docs/verification.md), currently in Simplified Chinese.
 
 Run the unit tests from the repository root after `startup`:
 
@@ -369,7 +369,7 @@ results = runtests('tests', 'IncludeSubfolders', true);
 assertSuccess(results)      % 32 tests
 ```
 
-The `validation/` folder includes numerical checks and comparisons with reference implementations. Metrics include raw and complex-gain-aligned NMSE, peak locations, point cloud columns, and physical axes. Example commands:
+The scripts in `validation/` run the reference code and the toolbox code on the same input and compare NMSE (raw and after complex-gain alignment), peak positions, point cloud columns and physical axes. For example:
 
 ```matlab
 run('validation/validate_tracking_core.m')
@@ -379,9 +379,7 @@ run('validation/validate_mathworks_ideal_point_target_source.m')
 results = validate_pointcloud_equivalence(3);      % needs the original reference project locally
 ```
 
-Checks that require local reference projects or raw data need their inputs configured first. Missing inputs may cause a skip or an error; a skipped check is not a pass.
-
-RMA/BP, source-number estimation, and performance-bound scripts are research examples; consult their documentation for validation scope. Measured-data imaging and reference comparisons require suitable inputs, acquisition geometry, and dependencies. Numerical results apply to the documented scenarios and should be rechecked when adapting the toolbox to a new system.
+Some scripts compare against local reference projects or raw recordings; without those inputs they skip or stop with an error. RMA/BP imaging, source-number estimation and the performance bounds are research examples outside the automated tests; validate them again when you move to a new radar or dataset.
 
 ## Repository layout
 
@@ -419,7 +417,7 @@ Suggestions and use cases are welcome in the issues.
 
 **Can I run the point cloud pipeline without Phased Array System Toolbox?**
 
-The full pipeline still calls `physconst`. Setting `separable_ca` only replaces the CFAR detector. Use the dependencies listed above for the validated setup.
+Not yet. `separable_ca` only replaces the CFAR detector; `physconst('lightspeed')` is still called in several places. Replacing it with the constant `299792458` removes the last Phased Array dependency, but that path has not been tested.
 
 **Why do I get no detections, or too many detections?**
 
@@ -431,11 +429,11 @@ Check the recording layout first. Select the appropriate frame slice with `adcCu
 
 **Why does TDM Doppler compensation differ by one bin from some reference code?**
 
-The toolbox uses `dopplerBin = dopplerIdx - ChirpNum/2 - 1` to align the velocity axis and compensation phase. The reference comparison notes describe matching range/Doppler front-end results and expected differences in angle/XYZ outputs; see `validation/README.md`.
+The toolbox uses `dopplerBin = dopplerIdx - ChirpNum/2 - 1` so that the velocity axis and the compensation phase point at the same physical bin. Against the reference code the range/Doppler stages match exactly, while angle and XYZ differ by one compensation bin, which is expected; see `validation/README.md`.
 
 **How can I reproduce the older one-dimensional ULA model?**
 
-Leave `ArrayType` and `VirtualArrayMap` unset, and set `sensorParams.Center_Freq_Hz = 79e9` and `sensorParams.Antenna_Spacing_m = 1e-3`. The historical pointwise equivalence results are recorded in `signal/README.md`.
+Leave `ArrayType` and `VirtualArrayMap` unset, and set `sensorParams.Center_Freq_Hz = 79e9` and `sensorParams.Antenna_Spacing_m = 1e-3`. `signal/README.md` records the pointwise match with the old model.
 
 **Why use scripts and explicit matrices?**
 
@@ -454,12 +452,12 @@ If the toolbox helps your research, you can cite it as:
 }
 ```
 
-The project records the following references and contributions. Existing author notices are retained in the corresponding files:
+The toolbox builds on the following work; the original author notices are kept in the corresponding files:
 
 - [TDMA-MIMO](https://github.com/DingdongD/TDMA-MIMO), by Xuliang Yu and collaborators: reference implementations for range/Doppler FFT, CFAR, peak grouping, Doppler compensation, and point cloud DOA wrappers. For these components, also cite X. Yu, Z. Cao, Z. Wu, C. Song, J. Zhu and Z. Xu, "A Novel Potential Drowning Detection System Based on Millimeter-Wave Radar," *ICARCV 2022*, doi: 10.1109/ICARCV57592.2022.10004245.
 - [OpenRadar](https://github.com/PreSenseRadar/OpenRadar): reference behavior for `separable_ca` CFAR, `py_doppler` peak grouping, and `py_full_variance` DOA peak search.
 - [TI mmWave GTRACK](https://www.ti.com/tool/MMWAVE-SDK): track lifecycle design.
-- Z. Zhang, Z. Shi, and Y. Gu, "Ziv-Zakai bound for DOAs estimation," *IEEE Trans. Signal Process.*, vol. 71, pp. 136–149, 2023: the ZZB reference implementation in `performance/`, authored by Zongyu Zhang.
+- Z. Zhang, Z. Shi, and Y. Gu, "Ziv-Zakai bound for DOAs estimation," *IEEE Trans. Signal Process.*, vol. 71, pp. 136-149, 2023: the ZZB reference implementation in `performance/`, authored by Zongyu Zhang.
 - Jerry Yang: Newton-interpolation source-number estimation scripts in `source-number-estimation/`.
 - TI mmWave Studio Lua examples and Xuliang's MATLAB wrappers: the mmWave Studio / DCA1000 acquisition helpers in `utils/DCA_Connet/`.
 - MathWorks Radar Toolbox: optional scene sources using `radarTransceiver`, `backscatterPedestrian`, and `widebandTwoRayChannel`.

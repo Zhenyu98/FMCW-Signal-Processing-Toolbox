@@ -71,6 +71,15 @@ run('validation/profile_pointcloud_cfar_diagnosis.m')
 这个脚本使用固定合成 `RDM` 对比 `phased_soca` 和 `separable_ca` 的运行时间、
 CFAR 点数和 peakFocus 点数。它只做 profiling，不作为等价性结论。
 
+整帧点云耗时对比：
+
+```matlab
+run('validation/profile_pointcloud_frame_time.m')
+```
+
+用 `demo_pointcloud_sim` 的 3 目标场景（256×64×12 cube）各跑 20 次，打印 legacy `phased_soca`
+和 `separable_ca` 两种配置下 `GeneratePointCloudFrame` 的中位耗时、点数和加速比。
+
 RA 点云管线验证入口：
 
 ```matlab
