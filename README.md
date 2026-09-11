@@ -3,12 +3,12 @@
 <p align="center"><strong>English</strong> · <a href="README_zh.md">简体中文</a></p>
 
 <p align="center">
-  <strong>Take mmWave radar algorithms from target parameters to point clouds and tracks—with reproducible MATLAB experiments.</strong>
+  <strong>One MATLAB toolbox for the whole FMCW mmWave radar chain: echo simulation, raw data, spectra, point clouds, angle estimation, tracking, SAR imaging and performance bounds.</strong>
 </p>
 
 <p align="center">
+  <strong>Full chain, simulation to tracks</strong> ·
   <strong>One parameter model across the pipeline</strong> ·
-  <strong>Shared processing for simulation and measurements</strong> ·
   <strong>Visible equations and intermediate results</strong>
 </p>
 
@@ -25,6 +25,7 @@
   <a href="#modules">Modules</a> ·
   <a href="#data-formats">Data Formats</a> ·
   <a href="#dependencies">Dependencies</a> ·
+  <a href="#roadmap">Roadmap</a> ·
   <a href="#faq">FAQ</a> ·
   <a href="#citation-and-acknowledgements">Acknowledgements</a>
 </p>
@@ -35,13 +36,30 @@
   <sub>Three simulated targets, a TI xWR1843-style 3Tx4Rx array, and 20 dB SNR. All three views are generated with this toolbox.</sub>
 </p>
 
+## One toolbox, the whole chain
+
+Most radar repositories cover one stage. This one runs from echo simulation to tracks and images along a single MATLAB path:
+
+| Stage | What is included |
+| --- | --- |
+| Echo simulation | Point targets, multi-scatterer bodies with chirp-level trajectories, TI virtual arrays, optional MathWorks pedestrian and multipath scenes |
+| Raw data | DCA1000 `.bin` reader, mmWave Studio capture scripts |
+| Spectra and maps | Range-Doppler, range-angle, range-time, Doppler-time, micro-Doppler |
+| Point clouds | 2D CFAR, peak grouping, TDM Doppler compensation, RD and RA pipelines |
+| Angle estimation | FFT, MUSIC, ESPRIT, IAA, L1-SVD, ANM, plus source-number estimation |
+| Tracking | DBSCAN centroids, GNN gating with Hungarian assignment, spherical EKF, track lifecycle |
+| SAR imaging | 2D RMA and back-projection |
+| Performance bounds | CRB and Ziv-Zakai bounds for DOA |
+
+Simulation, spectra, point clouds and tracking exchange the same radar cube and the same eight-column point cloud, so simulated and measured data run through identical code.
+
 ## Spend more time on the algorithm
 
 A range estimator works in isolation. The next question is whether it still works with a different array, moving targets, or measured data. Answering that often means reconnecting signal generation, detection, angle estimation, and tracking before the real experiment can begin.
 
 Much of that work lives at the interfaces: sample and channel dimensions, parameter units, coordinate conventions, and transmit timing. Individual modules can produce plausible outputs while describing different physical scenes.
 
-**FMCW Signal Processing Toolbox brings those components into an inspectable, reusable MATLAB workflow.** Designed for frequency-modulated continuous-wave radar research, it covers echo simulation, raw data reading, range and velocity spectra, 3D point clouds, and target tracking. Use it for signal processing experiments, perception prototypes, and research teaching.
+**FMCW Signal Processing Toolbox brings those components into an inspectable, reusable MATLAB workflow.** Designed for frequency-modulated continuous-wave radar research, it covers echo simulation, raw data reading, range and velocity spectra, 3D point clouds, angle estimation, target tracking, SAR imaging and performance bounds. Use it for signal processing experiments, perception prototypes, and research teaching.
 
 - **Build a complete experiment sooner.** Describe the radar and targets with `sensorParams` and `targetParams`, then connect echoes, detections, point clouds, and tracks through shared processing interfaces.
 - **Find the source of an error.** Inspect array geometry, timing, units, coordinates, equations, and intermediate variables to separate modeling and configuration issues from algorithm behavior.
@@ -384,6 +402,18 @@ FMCW-Signal-Processing-Toolbox/
 ├── tests/                      MATLAB unit tests
 └── docs/                       Validation record and README assets
 ```
+
+## Roadmap
+
+Today the toolbox simulates ideal point scatterers and can switch to MathWorks waveform-level scene models. The next steps bring it closer to real radars and real scenes:
+
+- **A more credible physical twin.** Range-dependent attenuation, RCS and richer scenes (moving cyclists, surface clutter, interference), then calibration against measured DCA1000 recordings on the way to a board-level digital twin.
+- **More radar models.** Array presets beyond the xWR1843 / xWR6843 / xWR1642 family, starting with TI cascade (AWR2243, 12Tx16Rx) and the coherent use of its redundant virtual channels, plus raw readers for other LVDS layouts.
+- **Multi-target tracking.** JPDA and other association methods next to GNN, adaptive measurement noise through the `RBuilder` hook, and validation on measured multi-frame sequences.
+- **Smarter point clouds.** Source-number estimation that sets the DOA peak count automatically, and sparse DOA methods without a CVX dependency.
+- **Easier to pick up.** A small sample recording for the real-data demo, MATLAB toolbox packaging, and English module documentation.
+
+Suggestions and use cases are welcome in the issues.
 
 ## FAQ
 

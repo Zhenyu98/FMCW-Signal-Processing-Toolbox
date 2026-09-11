@@ -3,12 +3,12 @@
 <p align="center"><a href="README.md">English</a> · <strong>简体中文</strong></p>
 
 <p align="center">
-  <strong>从目标参数到点云与航迹，让毫米波雷达算法更快进入可复现实验。</strong>
+  <strong>一个 MATLAB 工具箱覆盖 FMCW 毫米波雷达整条链路：回波仿真、原始数据、频谱、点云、测角、跟踪、SAR 成像和性能评估。</strong>
 </p>
 
 <p align="center">
+  <strong>整条链路全覆盖</strong> ·
   <strong>一套参数串起处理链路</strong> ·
-  <strong>仿真与实测共用处理接口</strong> ·
   <strong>关键公式与中间结果可见</strong>
 </p>
 
@@ -25,6 +25,7 @@
   <a href="#模块总览">模块总览</a> ·
   <a href="#数据格式约定">数据格式</a> ·
   <a href="#依赖">依赖</a> ·
+  <a href="#路线图">路线图</a> ·
   <a href="#faq">FAQ</a> ·
   <a href="#引用与致谢">引用与致谢</a>
 </p>
@@ -35,13 +36,30 @@
   <sub>仿真 3 个目标（TI xWR1843 风格 3Tx4Rx 阵列，SNR 20 dB）：range profile → range-Doppler map → TDM-MIMO 点云，全部由本工具箱生成。</sub>
 </p>
 
+## 一个工具箱，覆盖整条链路
+
+多数雷达仓库只做其中一段；这里从回波仿真一直到航迹和图像，全部在同一条 MATLAB 链路里：
+
+| 环节 | 包含的内容 |
+| --- | --- |
+| 回波仿真 | 点目标、带 chirp 级轨迹的多散射点人体、TI 虚拟阵列，可选 MathWorks 行人与多径场景 |
+| 原始数据 | DCA1000 `.bin` 读取、mmWave Studio 采集脚本 |
+| 频谱与图 | Range-Doppler、Range-Angle、Range-Time、Doppler-Time、micro-Doppler |
+| 点云 | 2D CFAR、峰值分组、TDM Doppler 补偿、RD 与 RA 两条管线 |
+| 测角 | FFT、MUSIC、ESPRIT、IAA、L1-SVD、ANM，以及信源数估计 |
+| 跟踪 | DBSCAN 质心、GNN 门限与 Hungarian 分配、球坐标 EKF、航迹生命周期 |
+| SAR 成像 | 2D RMA 与 Back-Projection |
+| 性能评估 | DOA 估计误差的 CRB 与 Ziv-Zakai 下界 |
+
+仿真、频谱、点云和跟踪之间交换的都是同一个 radar cube 和同一种八列点云，仿真数据和实测数据走的是同一份代码。
+
 ## 把时间用在算法上
 
 一个距离估计算法跑通之后，往往还要重新拼接信号生成、检测、测角和跟踪，才能回答真正关心的问题：换个阵列、加入运动目标或接入实测数据，结果还成立吗？
 
 毫米波雷达实验中，耗时的部分常常藏在这些接口里：采样与通道维度不一致、参数单位不同、坐标轴和多发射天线时序没有对齐。单个模块各自有结果，串起来却未必对应同一个物理场景。
 
-**FMCW Signal Processing Toolbox 将这些常用环节组织成可检查、可复用的 MATLAB 实验链路。** 它面向调频连续波（FMCW）雷达研究，覆盖回波仿真、原始数据读取、距离与速度谱、三维点云和目标跟踪，适合信号处理方法验证、感知算法原型和科研教学。
+**FMCW Signal Processing Toolbox 将这些常用环节组织成可检查、可复用的 MATLAB 实验链路。** 它面向调频连续波（FMCW）雷达研究，覆盖回波仿真、原始数据读取、距离与速度谱、三维点云、测角、目标跟踪、SAR 成像和性能评估，适合信号处理方法验证、感知算法原型和科研教学。
 
 - **更快搭起完整实验。** 用 `sensorParams` 和 `targetParams` 描述雷达与目标，把回波、检测、点云和航迹接到同一套处理流程中。
 - **更容易定位误差。** 保留阵列、时序、单位与坐标约定；核心公式和中间变量可直接查看，方便区分信号模型、参数配置和算法本身的问题。
@@ -226,7 +244,7 @@ adcData = adcCube(:, chirpStart:chirpEnd, :);
 
 对应工具：[`ZZB_DOAs`](performance/ZZB_DOAs.m)。按 [`Main_ZZB_Demo`](performance/Main_ZZB_Demo.m) 的原始参数运行：20 阵元、5 个非相干信源、40 快拍和 1,000 次随机角度采样。曲线为理论误差界，不是某个估计器的实测 RMSE；原论文引用见下方致谢。
 
-复现图集：前三组运行 `run('docs/generate_readme_gallery.m')`，测角、速度时间图、两径与性能界运行 `run('docs/generate_algorithm_gallery.m')`。图片写入 `docs/assets/`；运行前请保存工作区与图窗。后一脚本的两径部分需 Radar Toolbox，性能界部分另需 Statistics and Machine Learning Toolbox 与 Communications Toolbox。
+复现图集：前三组运行 `run('docs/generate_readme_gallery.m')`，测角、速度时间图、两径与性能评估运行 `run('docs/generate_algorithm_gallery.m')`。图片写入 `docs/assets/`；运行前请保存工作区与图窗。后一脚本的两径部分需 Radar Toolbox，性能评估部分另需 Statistics and Machine Learning Toolbox 与 Communications Toolbox。
 
 ## 模块总览
 
@@ -334,7 +352,7 @@ sensorParams.VirtualArrayMap = [             % or draw the virtual channel index
 | Phased Array System Toolbox | `physconst`、`phased.CFARDetector2D`（默认 CFAR） | 切换 CFAR 不会消除完整链路对 `physconst` 的依赖 |
 | Radar Toolbox | `RadarCubeGenerateMathWorks*` 官方场景信号源 | 不用这些入口即可，本地 `RadarCubeGenerate` 不依赖 |
 | [CVX](http://cvxr.com/cvx/) | `DOA_L1SVD`、`DOA_ANM` 稀疏 DOA | 其余 DOA 方法不依赖 |
-| Communications Toolbox | `performance/ZZB_DOAs.m` 中的 `qfunc` | 性能界示例需要 |
+| Communications Toolbox | `performance/ZZB_DOAs.m` 中的 `qfunc` | 性能评估示例需要 |
 | Statistics and Machine Learning Toolbox | `performance/ZZB_DOAs.m` 中的 `unifrnd` | 不运行该研究示例即可 |
 | TI mmWave Studio + DCA1000 | `utils/DCA_Connet/` 采集脚本；录制供 `readDCA1000Raw` 读取的 `adc_data.bin` | 只做仿真时不需要 |
 
@@ -363,7 +381,7 @@ results = validate_pointcloud_equivalence(3);      % needs the original referenc
 
 依赖本地参考工程或原始数据的脚本，需要先配置输入；缺失依赖时可能跳过或报错。跳过不能计为验证通过。
 
-RMA/BP、信源数估计和性能界脚本作为研究示例提供，验证范围见对应说明。实测成像与参考代码对照需要匹配的数据、采集几何和依赖。数值结果对应文档列出的场景，应用到新系统时应重新验证。
+RMA/BP、信源数估计和性能评估脚本作为研究示例提供，验证范围见对应说明。实测成像与参考代码对照需要匹配的数据、采集几何和依赖。数值结果对应文档列出的场景，应用到新系统时应重新验证。
 
 ## 目录结构
 
@@ -384,6 +402,18 @@ FMCW-Signal-Processing-Toolbox/
 ├── tests/                      runtests 单元测试
 └── docs/assets/                README 图片
 ```
+
+## 路线图
+
+工具箱现在的仿真源是理想点散射体，也可以切换到 MathWorks 的波形级场景模型。接下来的方向是让它更贴近真实雷达和真实场景：
+
+- **更可信的物理孪生。** 加入距离衰减、RCS 和更丰富的场景（骑行者、地面杂波、干扰），再用实测 DCA1000 数据做标定，逐步走向板级 digital twin。
+- **更多雷达型号。** 在 xWR1843 / xWR6843 / xWR1642 之外增加阵列预设，首先是 TI cascade（AWR2243，12Tx16Rx）和它冗余虚拟通道的相干利用；原始数据读取支持更多 LVDS 排布。
+- **多目标跟踪算法适配。** 在 GNN 之外接入 JPDA 等数据关联方法，通过 `RBuilder` 接口做自适应量测噪声，并在实测多帧序列上验证。
+- **更聪明的点云。** 用信源数估计自动确定 DOA 峰数；稀疏 DOA 方法去掉对 CVX 的依赖。
+- **更容易上手。** 提供实测 demo 用的小样例数据、MATLAB toolbox 打包和英文版模块文档。
+
+欢迎在 issue 里提需求和应用场景。
 
 ## FAQ
 
