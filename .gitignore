@@ -1,0 +1,52 @@
+# ---------------------------------------------------------------------------
+# Local reference projects and legacy scripts. Keep them on disk, never commit.
+# ---------------------------------------------------------------------------
+0_refer_code/
+
+# ---------------------------------------------------------------------------
+# Radar capture data and generated experiment artifacts.
+# ---------------------------------------------------------------------------
+*.bin
+*.mat
+*.csv
+*.log
+utils/Dataset/
+artifacts/
+
+# ---------------------------------------------------------------------------
+# Local manuals / OS metadata / editor state.
+# ---------------------------------------------------------------------------
+*.pdf
+*.docx
+.DS_Store
+__MACOSX/
+*.asv
+*.autosave
+
+# ---------------------------------------------------------------------------
+# Agent-side working files (AGENTS.md, skills, wiki, diagnosis notes).
+# They reference private paper folders, datasets and machine paths, so they
+# stay local. Remove an entry here if you decide to publish it.
+# ---------------------------------------------------------------------------
+.claude/
+.agents/
+AGENTS.md
+CLAUDE.md
+wiki/
+AGENT_INFRA_RESEARCH_*.md
+FMCW_TOOLBOX_DIAGNOSIS_REPORT.md
+TI 天线调查.md
+
+# Validation profiles that read private datasets from paper folders.
+validation/profile_*_py_style.m
+
+# Credentials and machine-local state.
+.env
+.env.*
+!.env.example
+auth.json
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+__pycache__/
